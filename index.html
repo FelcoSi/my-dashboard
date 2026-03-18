@@ -43,32 +43,29 @@
                 const response = await fetch(csvUrl);
                 const dataText = await response.text();
 
-                // Split the text into rows, but ignore completely empty rows
+                // Split into rows and ignore empty ones at the bottom
                 const rows = dataText.split('\n').filter(row => row.trim().length > 0); 
                 
-                // Skip the first row (headers)
+                // Skip the first row (headers: Customer ID, Name, etc.)
                 const dataRows = rows.slice(1); 
 
-                const months = [];
-                const leads = [];
+                const labels = [];
+                const dataPoints = [];
 
                 dataRows.forEach(row => {
-                    // This is a "bulletproof" regex that splits by comma, 
-                    // BUT ignores commas that are trapped inside quote marks (like "1,500")
                     const columns = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                     
-                    if (columns.length >= 2) {
-                        // 1. Grab Column A (0) for the Label/Month
-                        let monthLabel = columns[0].trim();
-                        // Remove quotes if Google Sheets added them
-                        monthLabel = monthLabel.replace(/^"|"$/g, ''); 
-                        months.push(monthLabel);
+                    // We need at least 4 columns to exist since we are grabbing Column D
+                    if (columns.length >= 4) {
+                        // 1. Grab Column B (index 1) for Customer Name
+                        let nameLabel = columns[1].trim();
+                        nameLabel = nameLabel.replace(/^"|"$/g, ''); 
+                        labels.push(nameLabel);
 
-                        // 2. Grab Column B (1) for the Numbers
-                        let rawNumber = columns[1].trim();
-                        // Remove quotes AND commas so JavaScript can read it as a pure number
-                        rawNumber = rawNumber.replace(/["',]/g, ''); 
-                        leads.push(parseFloat(rawNumber));
+                        // 2. Grab Column D (index 3) for Purchase Quantity
+                        let quantityNumber = columns[3].trim();
+                        quantityNumber = quantityNumber.replace(/["',]/g, ''); 
+                        dataPoints.push(parseFloat(quantityNumber));
                     }
                 });
 
@@ -78,18 +75,20 @@
 
                 // Draw or update the chart
                 if (myChart) {
-                    myChart.data.labels = months;
-                    myChart.data.datasets[0].data = leads;
+                    myChart.data.labels = labels;
+                    myChart.data.datasets[0].data = dataPoints;
+                    // Also update the tooltip label
+                    myChart.data.datasets[0].label = 'Purchase Quantity'; 
                     myChart.update(); 
                 } else {
                     const ctx = document.getElementById('myChart').getContext('2d');
                     myChart = new Chart(ctx, {
                         type: 'bar',
                         data: {
-                            labels: months,
+                            labels: labels,
                             datasets: [{
-                                label: 'New Leads',
-                                data: leads,
+                                label: 'Purchase Quantity',
+                                data: dataPoints,
                                 backgroundColor: 'rgba(34, 197, 94, 0.5)',
                                 borderColor: 'rgb(34, 197, 94)',
                                 borderWidth: 2
@@ -108,6 +107,7 @@
                 console.error("Error fetching data:", error);
             }
         }
+
 
 
         // Function to check the clock and trigger the refresh
