@@ -40,32 +40,47 @@
         // Function to fetch data and draw/update the chart
         async function fetchAndUpdateData() {
             try {
-                // Fetch the CSV data from Google Sheets
                 const response = await fetch(csvUrl);
                 const dataText = await response.text();
 
-                // Process the CSV text into arrays
-                const rows = dataText.split('\n').slice(1); // Skip the header row
+                // Split the text into rows, but ignore completely empty rows
+                const rows = dataText.split('\n').filter(row => row.trim().length > 0); 
+                
+                // Skip the first row (headers)
+                const dataRows = rows.slice(1); 
+
                 const months = [];
                 const leads = [];
 
-                rows.forEach(row => {
-                    const columns = row.split(',');
+                dataRows.forEach(row => {
+                    // This is a "bulletproof" regex that splits by comma, 
+                    // BUT ignores commas that are trapped inside quote marks (like "1,500")
+                    const columns = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    
                     if (columns.length >= 2) {
-                        months.push(columns[0].trim());
-                        leads.push(parseFloat(columns[1].trim()));
+                        // 1. Grab Column A (0) for the Label/Month
+                        let monthLabel = columns[0].trim();
+                        // Remove quotes if Google Sheets added them
+                        monthLabel = monthLabel.replace(/^"|"$/g, ''); 
+                        months.push(monthLabel);
+
+                        // 2. Grab Column B (1) for the Numbers
+                        let rawNumber = columns[1].trim();
+                        // Remove quotes AND commas so JavaScript can read it as a pure number
+                        rawNumber = rawNumber.replace(/["',]/g, ''); 
+                        leads.push(parseFloat(rawNumber));
                     }
                 });
 
-                // Update the "Last Updated" text on the screen
+                // Update the "Last Updated" text
                 const now = new Date();
                 document.getElementById('lastUpdated').innerText = 'Last Updated: ' + now.toLocaleTimeString();
 
-                // If the chart exists, update it. If not, create it!
+                // Draw or update the chart
                 if (myChart) {
                     myChart.data.labels = months;
                     myChart.data.datasets[0].data = leads;
-                    myChart.update(); // Smoothly animates the new data
+                    myChart.update(); 
                 } else {
                     const ctx = document.getElementById('myChart').getContext('2d');
                     myChart = new Chart(ctx, {
@@ -93,6 +108,7 @@
                 console.error("Error fetching data:", error);
             }
         }
+
 
         // Function to check the clock and trigger the refresh
         function checkSchedule() {
